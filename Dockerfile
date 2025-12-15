@@ -14,6 +14,7 @@ ENV PATH="/root/.local/bin:$PATH"
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
 COPY openai_server.py ./
+COPY fetch_models.py ./
 
 # Install Python dependencies with uv
 RUN uv sync --frozen --no-dev

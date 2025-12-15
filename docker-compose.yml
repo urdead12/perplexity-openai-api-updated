@@ -17,7 +17,6 @@ services:
       - MAX_CONVERSATIONS_PER_USER=${MAX_CONVERSATIONS_PER_USER:-100}
       - DEFAULT_MODEL=${DEFAULT_MODEL:-perplexity-auto}
       - DEFAULT_CITATION_MODE=${DEFAULT_CITATION_MODE:-CLEAN}
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
