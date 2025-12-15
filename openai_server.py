@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import re
 import sys
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -16,7 +18,7 @@ from datetime import datetime
 from typing import Any, AsyncGenerator, Dict
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -554,6 +556,21 @@ def get_user(request: Request) -> str | None:
         return request.headers.get("X-User-ID")
 
 
+def get_user_from_headers(headers: dict[str, str] | None) -> str | None:
+    """Get user identifier from headers (e.g., WebSocket handshake headers)."""
+    if not config.api_key:
+        return None
+
+    if not headers:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    auth = headers.get("authorization", "")
+    if auth.startswith("Bearer ") and auth[7:] == config.api_key:
+        return hashlib.sha256(auth[7:].encode()).hexdigest()[:16]
+
+    raise HTTPException(status_code=401, detail="Invalid API key")
+
+
 def messages_to_query(messages: list[ChatMessage]) -> str:
     """Convert messages to query string."""
     user_msgs = [m for m in messages if m.role == "user"]
@@ -697,7 +714,8 @@ async def chat_completions(request: Request, body: ChatRequest):
                 headers={"Cache-Control": "no-cache", "X-Conversation-ID": conv_id},
             )
         else:
-            session.conversation.ask(query, model=model_obj, stream=False)
+            # The scraper client is synchronous and may block. Run in a worker thread.
+            await asyncio.to_thread(session.conversation.ask, query, model=model_obj, stream=False)
             answer = session.conversation.answer or ""
             
             return ChatResponse(
@@ -730,18 +748,172 @@ async def stream_response(
     """Stream chat response."""
     # Initial chunk
     yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'role': 'assistant', 'content': ''})]).model_dump_json()}\n\n"
-    
-    last = ""
-    for resp in session.conversation.ask(query, model=model, stream=True):
-        current = resp.answer or ""
-        if len(current) > len(last):
-            delta = current[len(last):]
-            last = current
-            yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'content': delta})]).model_dump_json()}\n\n"
+
+    # The underlying streaming generator is synchronous and can block the event loop.
+    # Move it to a background thread and ship deltas back through an asyncio queue.
+    queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def producer() -> None:
+        last = ""
+        try:
+            for resp in session.conversation.ask(query, model=model, stream=True):
+                current = resp.answer or ""
+                if len(current) > len(last):
+                    delta = current[len(last):]
+                    last = current
+                    loop.call_soon_threadsafe(queue.put_nowait, ("delta", delta))
+            loop.call_soon_threadsafe(queue.put_nowait, ("done", ""))
+        except Exception as e:
+            # Some upstreams intermittently fail in streaming mode but still work in
+            # non-stream mode. Fallback so clients still get an answer.
+            try:
+                session.conversation.ask(query, model=model, stream=False)
+                current = session.conversation.answer or ""
+                if len(current) > len(last):
+                    loop.call_soon_threadsafe(queue.put_nowait, ("delta", current[len(last):]))
+                loop.call_soon_threadsafe(queue.put_nowait, ("done", ""))
+            except Exception as e2:
+                loop.call_soon_threadsafe(queue.put_nowait, ("error", str(e2) or str(e)))
+
+    threading.Thread(target=producer, daemon=True).start()
+
+    while True:
+        kind, payload = await queue.get()
+        if kind == "delta":
+            yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'content': payload})]).model_dump_json()}\n\n"
+        elif kind == "error":
+            logging.error(f"Streaming error: {payload}")
+            yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='error')]).model_dump_json()}\n\n"
+            break
+        else:
+            break
     
     # Final chunk
     yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='stop')]).model_dump_json()}\n\n"
     yield "data: [DONE]\n\n"
+
+
+@app.websocket("/ws")
+async def ws_chat(ws: WebSocket):
+    """WebSocket bridge for clients that expect a /ws endpoint.
+
+    Protocol:
+    - Client sends a JSON payload compatible with ChatRequest.
+    - If stream=true, server sends SSE-formatted frames (same as HTTP streaming endpoint).
+    - If stream=false, server sends one JSON ChatResponse.
+
+    Notes:
+    - By default the socket is closed after one request/response.
+      Set keep_open=true to send multiple requests on the same connection.
+    - If ws_stream_format="json", the server converts SSE frames to raw JSON strings
+      (ChatChunk JSON) and sends a final {"type":"done"} message.
+    """
+    await ws.accept()
+
+    # Auth (if enabled)
+    try:
+        user_id = get_user_from_headers(dict(ws.headers))
+    except HTTPException:
+        await ws.close(code=4401)
+        return
+
+    global request_count
+
+    while True:
+        try:
+            raw = await ws.receive_text()
+        except Exception:
+            return
+
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            await ws.send_text(json.dumps({"error": "Invalid JSON"}))
+            await ws.close(code=1003)
+            return
+
+        # Lightweight ping/pong for clients that keep the socket alive
+        if isinstance(payload, dict) and payload.get("type") == "ping":
+            await ws.send_text('{"type":"pong"}')
+            continue
+
+        keep_open = bool(isinstance(payload, dict) and payload.get("keep_open", False))
+        ws_stream_format = "sse"
+        if isinstance(payload, dict):
+            ws_stream_format = str(payload.get("ws_stream_format", "sse")).lower().strip()
+
+        try:
+            body = ChatRequest.model_validate(payload)
+        except Exception as e:
+            await ws.send_text(json.dumps({"error": f"Invalid request: {e}"}))
+            await ws.close(code=1003)
+            return
+
+        request_count += 1
+
+        if not body.messages:
+            await ws.send_text(json.dumps({"error": "Messages required"}))
+            await ws.close(code=1003)
+            return
+
+        model_obj = models.get(body.model)
+        citation_mode = parse_citation_mode(body.citation_mode)
+
+        conv_id, session = manager.get_or_create(
+            body.conversation_id, user_id, body.model, citation_mode
+        )
+
+        response_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+        created = int(time.time())
+
+        # Send conversation id so the client can reuse it
+        await ws.send_text(json.dumps({"type": "meta", "conversation_id": conv_id, "response_id": response_id}))
+
+        try:
+            if body.stream:
+                async for frame in stream_response(
+                    response_id,
+                    created,
+                    body.model,
+                    model_obj,
+                    messages_to_query(body.messages),
+                    session,
+                ):
+                    if ws_stream_format == "json" and frame.startswith("data: "):
+                        data = frame[len("data: "):].strip()
+                        if data == "[DONE]":
+                            await ws.send_text(json.dumps({"type": "done"}))
+                        else:
+                            await ws.send_text(data)
+                    else:
+                        await ws.send_text(frame)
+            else:
+                query = messages_to_query(body.messages)
+                await asyncio.to_thread(session.conversation.ask, query, model=model_obj, stream=False)
+                answer = session.conversation.answer or ""
+
+                resp = ChatResponse(
+                    id=response_id,
+                    created=created,
+                    model=body.model,
+                    choices=[ChatChoice(index=0, message=ChatMessage(role="assistant", content=answer))],
+                    usage=Usage(
+                        prompt_tokens=estimate_tokens(query),
+                        completion_tokens=estimate_tokens(answer),
+                        total_tokens=estimate_tokens(query) + estimate_tokens(answer),
+                    ),
+                )
+                await ws.send_text(resp.model_dump_json())
+
+            if not keep_open:
+                await ws.close(code=1000)
+                return
+        except Exception as e:
+            logging.error(f"WebSocket request error: {e}")
+            await ws.send_text(json.dumps({"error": str(e)}))
+            await ws.close(code=1011)
+            return
 
 
 # =============================================================================
