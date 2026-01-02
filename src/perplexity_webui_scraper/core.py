@@ -378,12 +378,51 @@ class Conversation:
         try:
             response = self._http.post(ENDPOINT_UPLOAD, json=json_data)
             response_data = response.json()
-            upload_url = response_data.get("results", {}).get(file_uuid, {}).get("s3_object_url")
+            result = response_data.get("results", {}).get(file_uuid, {})
+            
+            s3_bucket_url = result.get("s3_bucket_url")
+            s3_object_url = result.get("s3_object_url")
+            fields = result.get("fields", {})
 
-            if not upload_url:
+            if not s3_object_url:
                 raise FileUploadError(file_info.path, "No upload URL returned")
+            
+            if not s3_bucket_url or not fields:
+                raise FileUploadError(file_info.path, "Missing S3 upload credentials")
 
-            return upload_url
+            # Upload the file to S3 using presigned POST
+            file_path = Path(file_info.path)
+            with file_path.open("rb") as f:
+                file_content = f.read()
+            
+            # Build multipart form data using CurlMime
+            # For S3 presigned POST, form fields must come before the file
+            from curl_cffi import CurlMime
+            
+            mp = CurlMime()
+            # Add all presigned form fields first
+            for field_name, field_value in fields.items():
+                mp.addpart(name=field_name, data=field_value)
+            # Add the file last (required for S3 presigned POST)
+            mp.addpart(
+                name="file",
+                content_type=file_info.mimetype,
+                filename=file_path.name,
+                data=file_content,
+            )
+            
+            from curl_cffi.requests import Session
+            upload_session = Session()
+            upload_response = upload_session.post(s3_bucket_url, multipart=mp)
+            mp.close()
+            
+            if upload_response.status_code not in (200, 201, 204):
+                raise FileUploadError(
+                    file_info.path, 
+                    f"S3 upload failed with status {upload_response.status_code}: {upload_response.text}"
+                )
+
+            return s3_object_url
         except FileUploadError as error:
             raise error
         except Exception as e:
