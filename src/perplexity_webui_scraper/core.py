@@ -1,4 +1,6 @@
-"""Core client implementation."""
+"""
+Core client implementation.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from curl_cffi import CurlMime
+from curl_cffi.requests import Session
 from orjson import JSONDecodeError, loads
 
 
@@ -376,16 +380,55 @@ class Conversation:
         try:
             response = self._http.post(ENDPOINT_UPLOAD, json=json_data)
             response_data = response.json()
-            upload_url = response_data.get("results", {}).get(file_uuid, {}).get("s3_object_url")
+            result = response_data.get("results", {}).get(file_uuid, {})
 
-            if not upload_url:
+            s3_bucket_url = result.get("s3_bucket_url")
+            s3_object_url = result.get("s3_object_url")
+            fields = result.get("fields", {})
+
+            if not s3_object_url:
                 raise FileUploadError(file_info.path, "No upload URL returned")
 
-            return upload_url
+            if not s3_bucket_url or not fields:
+                raise FileUploadError(file_info.path, "Missing S3 upload credentials")
+
+            # Upload the file to S3 using presigned POST
+            file_path = Path(file_info.path)
+
+            with file_path.open("rb") as f:
+                file_content = f.read()
+
+            # Build multipart form data using CurlMime
+            # For S3 presigned POST, form fields must come before the file
+            mime = CurlMime()
+
+            for field_name, field_value in fields.items():
+                mime.addpart(name=field_name, data=field_value)
+
+            mime.addpart(
+                name="file",
+                content_type=file_info.mimetype,
+                filename=file_path.name,
+                data=file_content,
+            )
+
+            # S3 requires a clean session
+            with Session() as s3_session:
+                upload_response = s3_session.post(s3_bucket_url, multipart=mime)
+
+            mime.close()
+
+            if upload_response.status_code not in (200, 201, 204):
+                raise FileUploadError(
+                    file_info.path,
+                    f"S3 upload failed with status {upload_response.status_code}: {upload_response.text}",
+                )
+
+            return s3_object_url
         except FileUploadError as error:
             raise error
-        except Exception as e:
-            raise FileUploadError(file_info.path, str(e)) from e
+        except Exception as error:
+            raise FileUploadError(file_info.path, str(error)) from error
 
     def _build_payload(
         self,
@@ -460,9 +503,10 @@ class Conversation:
         return CITATION_PATTERN.sub(replacer, text)
 
     def _parse_line(self, line: str | bytes) -> dict[str, Any] | None:
-        prefix = b"data: " if isinstance(line, bytes) else "data: "
+        if isinstance(line, bytes) and line.startswith(b"data: "):
+            return loads(line[6:])
 
-        if (isinstance(line, bytes) and line.startswith(prefix)) or (isinstance(line, str) and line.startswith(prefix)):
+        if isinstance(line, str) and line.startswith("data: "):
             return loads(line[6:])
 
         return None
@@ -493,10 +537,10 @@ class Conversation:
 
         try:
             json_data = loads(data["text"])
-        except KeyError as e:
-            raise ValueError("Missing 'text' field in data") from e
-        except JSONDecodeError as e:
-            raise ValueError("Invalid JSON in 'text' field") from e
+        except KeyError as error:
+            raise ValueError("Missing 'text' field in data") from error
+        except JSONDecodeError as error:
+            raise ValueError("Invalid JSON in 'text' field") from error
 
         answer_data: dict[str, Any] = {}
 
@@ -583,7 +627,8 @@ class Conversation:
         chunks = answer_data.get("chunks", [])
 
         if chunks:
-            self._chunks = [self._format_citations(chunk) for chunk in chunks]
+            formatted = [self._format_citations(chunk) for chunk in chunks if chunk is not None]
+            self._chunks = [c for c in formatted if c is not None]
 
         self._raw_data = answer_data
 
