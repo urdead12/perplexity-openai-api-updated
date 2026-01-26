@@ -48,6 +48,21 @@ class Models:
     Sonar - Perplexity's fast model.
     """
 
+    GEMINI_3_FLASH = Model(identifier="gemini30flash")
+    """
+    Gemini 3 Flash - Google's fast reasoning model.
+    """
+
+    GEMINI_3_FLASH_THINKING = Model(identifier="gemini30flash_high")
+    """
+    Gemini 3 Flash Thinking - Google's fast reasoning model with enhanced thinking.
+    """
+
+    GEMINI_3_PRO = Model(identifier="gemini30pro")
+    """
+    Gemini 3 Pro - Google's newest reasoning model.
+    """
+
     GPT_52 = Model(identifier="gpt52")
     """
     GPT-5.2 - OpenAI's latest model.
@@ -58,6 +73,16 @@ class Models:
     GPT-5.2 Thinking - OpenAI's latest model with thinking.
     """
 
+    CLAUDE_45_SONNET = Model(identifier="claude45sonnet")
+    """
+    Claude Sonnet 4.5 - Anthropic's newest advanced model.
+    """
+
+    CLAUDE_45_SONNET_THINKING = Model(identifier="claude45sonnetthinking")
+    """
+    Claude Sonnet 4.5 Thinking - Anthropic's newest reasoning model.
+    """
+
     CLAUDE_45_OPUS = Model(identifier="claude45opus")
     """
     Claude Opus 4.5 - Anthropic's Opus reasoning model.
@@ -66,21 +91,6 @@ class Models:
     CLAUDE_45_OPUS_THINKING = Model(identifier="claude45opusthinking")
     """
     Claude Opus 4.5 Thinking - Anthropic's Opus reasoning model with thinking.
-    """
-
-    GEMINI_3_PRO = Model(identifier="gemini30pro")
-    """
-    Gemini 3 Pro - Google's newest reasoning model.
-    """
-
-    GEMINI_3_FLASH = Model(identifier="gemini30flash")
-    """
-    Gemini 3 Flash - Google's fast reasoning model.
-    """
-
-    GEMINI_3_FLASH_THINKING = Model(identifier="gemini30flash_high")
-    """
-    Gemini 3 Flash Thinking - Google's fast reasoning model with enhanced thinking.
     """
 
     GROK_41 = Model(identifier="grok41nonreasoning")
@@ -96,14 +106,4 @@ class Models:
     KIMI_K2_THINKING = Model(identifier="kimik2thinking")
     """
     Kimi K2 Thinking - Moonshot AI's latest reasoning model.
-    """
-
-    CLAUDE_45_SONNET = Model(identifier="claude45sonnet")
-    """
-    Claude Sonnet 4.5 - Anthropic's newest advanced model.
-    """
-
-    CLAUDE_45_SONNET_THINKING = Model(identifier="claude45sonnetthinking")
-    """
-    Claude Sonnet 4.5 Thinking - Anthropic's newest reasoning model.
     """
