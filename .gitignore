@@ -74,6 +74,15 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
+.debug/
+tools
+
+# ─ ─── Files ─── ─ #
+example*.py
+publish.sh
+
+# ─ ─── Extensions ─── ─ #
+*.env
 .installed.cfg
 *.egg
 MANIFEST

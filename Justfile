@@ -4,6 +4,7 @@ default:
 # Development
 lint:
     uv run ruff check
+    uv run ty check
 
 format:
     uv run ruff format
