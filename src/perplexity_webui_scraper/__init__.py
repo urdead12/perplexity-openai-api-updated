@@ -7,24 +7,44 @@ from importlib import metadata
 from .config import ClientConfig, ConversationConfig
 from .core import Conversation, Perplexity
 from .enums import CitationMode, LogLevel, SearchFocus, SourceFocus, TimeRange
+from .exceptions import (
+    AuthenticationError,
+    CloudflareBlockError,
+    FileUploadError,
+    FileValidationError,
+    PerplexityError,
+    RateLimitError,
+    ResearchClarifyingQuestionsError,
+    ResponseParsingError,
+    StreamingError,
+)
 from .models import Model, Models
 from .types import Coordinates, Response, SearchResultItem
 
 
 __version__: str = metadata.version("perplexity-webui-scraper")
 __all__: list[str] = [
+    "AuthenticationError",
     "CitationMode",
     "ClientConfig",
+    "CloudflareBlockError",
     "Conversation",
     "ConversationConfig",
     "Coordinates",
+    "FileUploadError",
+    "FileValidationError",
     "LogLevel",
     "Model",
     "Models",
     "Perplexity",
+    "PerplexityError",
+    "RateLimitError",
+    "ResearchClarifyingQuestionsError",
     "Response",
+    "ResponseParsingError",
     "SearchFocus",
     "SearchResultItem",
     "SourceFocus",
+    "StreamingError",
     "TimeRange",
 ]
