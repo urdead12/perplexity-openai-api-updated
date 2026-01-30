@@ -80,6 +80,9 @@ class ServerConfig:
         
         session_token = os.getenv("PERPLEXITY_SESSION_TOKEN")
         if not session_token:
+            session_token = os.environ.get("PERPLEXITY_SESSION_TOKEN")
+
+        if not session_token:
             print("❌ Error: PERPLEXITY_SESSION_TOKEN environment variable is required")
             print("\n📋 To get your session token:")
             print("1. Log in at https://www.perplexity.ai")
@@ -90,7 +93,7 @@ class ServerConfig:
         
         return cls(
             session_token=session_token,
-            api_key=os.getenv("OPENAI_API_KEY"),
+            api_key=os.getenv("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY"),
             host=os.getenv("HOST", "0.0.0.0"),
             port=int(os.getenv("PORT", "8000")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
