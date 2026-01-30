@@ -28,7 +28,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 # Add src to path for local development
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+# Use an absolute path to ensure it works when run from different directories
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(script_dir, "src"))
 
 from perplexity_webui_scraper import (
     CitationMode,
