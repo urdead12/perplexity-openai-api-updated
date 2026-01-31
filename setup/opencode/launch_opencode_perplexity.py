@@ -29,6 +29,8 @@ from setup.common.launcher_utils import (
     stop_process,
     fetch_available_models,
     get_install_dir,
+    LogManager,
+    ServiceMonitor,
 )
 
 
@@ -181,6 +183,8 @@ Examples:
         extra_args = extra_args[1:]
 
     server_process = None
+    log_manager = None
+    monitor = None
 
     try:
         # Get installation directory
@@ -195,7 +199,7 @@ Examples:
 
         if args.opencode_only:
             # Only launch OpenCode (server should already be running)
-            print_info("Server-only mode - checking if server is running...")
+            print_info("OpenCode-only mode - checking if server is running...")
             if not is_port_in_use(8000):
                 print_error("Server is not running on port 8000")
                 print_info("Please start the server first or run without --opencode-only")
@@ -210,6 +214,9 @@ Examples:
             launch_opencode(extra_args)
 
         else:
+            # Create log manager
+            log_manager = LogManager(install_dir)
+
             # Start server (unless already running)
             if is_port_in_use(8000):
                 if check_service_health("http://localhost:8000/health"):
@@ -219,12 +226,15 @@ Examples:
                     print_info("Please stop the process using port 8000 and try again")
                     sys.exit(1)
             else:
-                # Start the server
-                log_file = install_dir / "logs" / f"server_{time.strftime('%Y%m%d_%H%M%S')}.log"
-                log_file.parent.mkdir(parents=True, exist_ok=True)
+                # Start the server with log manager
+                server_process = start_perplexity_server(repo_dir, venv_python, log_manager)
 
-                server_process = start_perplexity_server(repo_dir, venv_python, log_file)
-                print_info(f"Server logs: {log_file}")
+            # Start service monitor
+            if server_process:
+                monitor = ServiceMonitor({
+                    "Perplexity Server": (server_process, "http://localhost:8000/health")
+                })
+                monitor.start()
 
             # Fetch and update models
             print()
@@ -250,6 +260,13 @@ Examples:
                 print_success("Server is running!")
                 print_info("Perplexity Server: http://localhost:8000")
                 print()
+                print_info(f"Logs directory: {log_manager.logs_dir}")
+                print()
+
+                # Open tail windows on Windows
+                if server_process and log_manager:
+                    log_manager.open_tail_windows(["Perplexity"])
+
                 print_info("Press Ctrl+C to stop the server...")
                 print()
 
@@ -260,6 +277,10 @@ Examples:
                     print()
                     print_info("Shutting down...")
             else:
+                # Open tail windows on Windows
+                if server_process and log_manager:
+                    log_manager.open_tail_windows(["Perplexity"])
+
                 # Launch OpenCode
                 launch_opencode(extra_args)
 
@@ -277,9 +298,19 @@ Examples:
         traceback.print_exc()
         sys.exit(1)
     finally:
+        # Stop monitor
+        if monitor:
+            monitor.stop()
+
         # Clean up server process if we started it
         if server_process:
             stop_process(server_process, "Perplexity Server")
+
+        # Close log files
+        if log_manager:
+            log_manager.close_all()
+            print_info(f"Logs saved to: {log_manager.logs_dir}")
+            print()
 
 
 if __name__ == "__main__":

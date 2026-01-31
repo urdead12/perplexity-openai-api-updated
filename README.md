@@ -1,338 +1,251 @@
-# Perplexity OpenAI-Compatible API Server + Claude Code Integration
+# Perplexity OpenAI API - AI Coding Assistant Integration
 
-Transform Perplexity AI into a drop-in replacement for OpenAI's API with seamless Claude Code integration. This project bridges the gap between Perplexity's powerful search-augmented intelligence and Claude Code, allowing you to leverage Perplexity's models directly within your Claude development environment.
+OpenAI-compatible API server for Perplexity AI with seamless integration for AI coding assistants.
 
-It is forked from [henrique-coder/perplexity-webui-scraper](https://github.com/henrique-coder/perplexity-webui-scraper) and uses Python and FastAPI to create a RESTful API server.
+Forked from [henrique-coder/perplexity-webui-scraper](https://github.com/henrique-coder/perplexity-webui-scraper) and built with Python and FastAPI.
 
-## 🎯 Goal
+## 🚀 Quick Start
 
-Use Perplexity's models and search capabilities within Claude Code through an OpenAI-compatible API. This allows you to:
-
-- Access Perplexity's search-augmented AI directly in Claude Code
-- Choose from multiple models available on Perplexity (auto, research, sonar, and more)
-- Maintain a single unified interface through the LiteLLM proxy
-- Automatically discover and configure available models
-
-## ✨ Features
-
-- **Automatic Model Discovery** - Models are automatically discovered from Perplexity and configured
-- **Claude Code Integration** - Dedicated launcher scripts for seamless integration with Claude Code
-- **Real-time Monitoring** - Health checks and auto-alerts when services go down
-- **Logging & Debugging** - Timestamped log files for both stdout and stderr of each service
-- **Live Tail Windows** - Real-time output windows on Windows showing service logs
-- **OpenAI Compatible** - Drop-in replacement for OpenAI's API
-- **Multi-Model Support** - Access all Perplexity models and other LLMs through LiteLLM
-- **Request Rate Limiting** - Built-in protection against API abuse
-- **Docker Support** - One-click deployment with Docker
-
-## 📋 Prerequisites
-
-- **Perplexity Pro/Max account**
-- **Session token** (`__Secure-next-auth.session-token` cookie from your browser)
-- **Python 3.8+** (for local installation)
-- **Claude Code CLI** (for Claude integration)
-- **PowerShell** (for real-time tail windows on Windows)
-
-## 🚀 Quick Start - Claude Code Integration
-
-The easiest way to use Perplexity with Claude Code is with the launcher scripts:
-
-### Installation
-
+**Interactive Setup (Recommended)**:
 ```bash
-# Run the installation script (one-time setup)
-python install_claude_perplexity.py
+python perplexity_setup.py
 ```
 
-This will:
-- Create a virtual environment
-- Install all dependencies
-- Set up the configuration files
-- Configure your Perplexity session token
+**Or choose your variant**:
 
-### Usage
-
-#### 1. Default Mode: Start Everything Together
+### OpenCode (Open Source - Simpler)
 
 ```bash
+# Install
+python setup/opencode/install_opencode_perplexity.py
+
+# Set token
+export PERPLEXITY_SESSION_TOKEN='your_token'
+
+# Launch
+python setup/opencode/launch_opencode_perplexity.py
+```
+
+### Claude Code (Anthropic's CLI)
+
+```bash
+# Install (original location)
+python install_claude_perplexity.py
+
+# Set token
+export PERPLEXITY_SESSION_TOKEN='your_token'
+
+# Launch (original location)
 python launch_claude_perplexity.py
 ```
 
-This will:
-1. Start the Perplexity wrapper server (port 8000)
-2. Discover available models
-3. Update LiteLLM configuration
-4. Start the LiteLLM proxy (port 8080)
-5. Open live tail windows showing service output (Windows only)
-6. Ask you to select a model
-7. Launch Claude Code with the selected model
-8. Monitor services and alert if they go down
+## 📖 Full Documentation
 
-#### 2. Services Only Mode: Keep Services Running
+- **[QUICK_START.md](QUICK_START.md)** - Get started in 5 minutes
+- **[README_VARIANTS.md](README_VARIANTS.md)** - Detailed guide comparing both variants
+- **[SCRIPTS_README.md](SCRIPTS_README.md)** - Script documentation and reference
 
-```bash
-python launch_claude_perplexity.py --services-only
-```
+## 🎯 What Is This?
 
-Starts and keeps the services running (useful for running in one terminal while using Claude in another). Opens live tail windows automatically on Windows.
+Transform Perplexity AI into an OpenAI-compatible API with support for AI coding assistants:
 
-```
-Services are running!
-  Perplexity Wrapper: http://localhost:8000
-  LiteLLM Proxy: http://localhost:8080
+✅ **Two Variants**:
+- **OpenCode** - Open source, direct connection, single port (8000)
+- **Claude Code** - With LiteLLM proxy, dual ports (8000 + 8080)
 
-Press Ctrl+C to stop services...
-Logs are saved in: C:\Users\user\.claude-perplexity\logs
-```
+✅ **OpenAI API Compatible** - Works with any OpenAI SDK/client
 
-#### 3. Claude Only Mode: Launch Claude with Existing Services
+✅ **Automatic Model Discovery** - Dynamically finds and configures models
 
-```bash
-python launch_claude_perplexity.py --claude-only
-```
+✅ **Comprehensive Debugging** - Log files, tail windows, health monitoring
 
-Assumes services are already running, displays available models, and launches Claude with your selection:
-
-```
-Available Models:
-  1. perplexity-auto
-  2. perplexity-research
-  3. perplexity-sonar
-
-Select model (1-3) or press Enter for first: _
-```
-
-#### 4. Pass Arguments to Claude
-
-You can pass any arguments directly to Claude Code using `--`:
-
-```bash
-# Launch with a file
-python launch_claude_perplexity.py -- /path/to/file.py
-
-# Launch with a prompt
-python launch_claude_perplexity.py -- -p "Write a Python script"
-
-# Launch with model selection and message
-python launch_claude_perplexity.py --claude-only -- -m "Explain this code"
-
-# Get Claude help
-python launch_claude_perplexity.py -- --help
-```
+✅ **Streaming Support** - Real-time streaming responses
 
 ## 🔧 How It Works
 
-The launcher scripts create a complete stack:
+### OpenCode Variant (Simpler)
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Claude Code                      │
-│   (ANTHROPIC_BASE_URL=http://localhost:8080)       │
-└──────────────────┬──────────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│          LiteLLM Proxy (port 8080)                  │
-│   (Maps Claude requests to available models)        │
-└──────────────────┬──────────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│    Perplexity OpenAI API (port 8000)                │
-│   (Handles Perplexity authentication & requests)    │
-└──────────────────┬──────────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│         Perplexity AI (via web scraper)             │
-└─────────────────────────────────────────────────────┘
+OpenCode CLI → Perplexity OpenAI Server (8000) → Perplexity.ai
 ```
 
-### Step-by-Step Process
+### Claude Code Variant
 
-1. **Model Discovery**: After the Perplexity wrapper starts, the launcher queries `/v1/models` to discover available models
-2. **Config Update**: The discovered models are written to `litellm_config.yaml` with proper mappings
-3. **LiteLLM Start**: LiteLLM starts with the updated configuration
-4. **Health Checks**: Services are health-checked before proceeding
-5. **Live Output**: Tail windows open (Windows only) showing real-time service logs
-6. **User Selection**: Available models are displayed and user selects one
-7. **Claude Launch**: Claude Code starts with `ANTHROPIC_MODEL` set to the selected model
-8. **Monitoring**: Background service monitor alerts if services go down
-
-## 📝 Configuration
-
-### Environment Variables
-
-Create a `.env` file in the project directory:
-
-```bash
-# Required: Perplexity session token
-PERPLEXITY_SESSION_TOKEN=your_session_token_here
-
-# Optional
-PORT=8000                    # Server port (default: 8000)
-LOG_LEVEL=INFO              # Logging level (default: INFO)
-ENABLE_RATE_LIMITING=true   # Enable rate limiting (default: true)
-REQUESTS_PER_MINUTE=60      # Rate limit (default: 60)
-CONVERSATION_TIMEOUT=3600   # Session timeout in seconds (default: 3600)
-DEFAULT_MODEL=perplexity-auto  # Default model (default: perplexity-auto)
+```
+Claude Code → LiteLLM Proxy (8080) → Perplexity OpenAI Server (8000) → Perplexity.ai
 ```
 
-### Getting Your Session Token
+## ✨ Key Features
 
-You can obtain your session token in two ways:
+### For Both Variants
 
-#### Option 1: Automatic (CLI Tool)
+- **Automatic Model Discovery** - Models discovered from Perplexity and configured
+- **Real-time Monitoring** - Health checks and alerts when services go down
+- **Comprehensive Logging** - Timestamped log files for stdout/stderr
+- **Live Tail Windows** - Real-time output windows (Windows PowerShell)
+- **OpenAI Compatible** - Drop-in replacement for OpenAI's API
+- **Rate Limiting** - Built-in protection against API abuse
+- **Conversation Management** - Persistent multi-turn conversations
+- **Streaming Support** - Server-Sent Events for real-time responses
 
-```bash
-get-perplexity-session-token
-```
+### Claude Code Variant Specific
 
-This interactive tool will:
-1. Ask for your Perplexity email
-2. Send a verification code to your email
-3. Accept either a 6-digit code or magic link
-4. Extract and display your session token
-5. Optionally save it to your `.env` file
+- **LiteLLM Integration** - Advanced model routing and management
+- **Multi-Service Monitoring** - Monitors both Perplexity and LiteLLM
+- **Automatic Configuration** - Generates litellm_config.yaml automatically
 
-#### Option 2: Manual (Browser)
+### OpenCode Variant Specific
+
+- **Direct Connection** - No proxy, simpler architecture
+- **JSON Configuration** - Easy-to-edit OpenCode config file
+- **Lightweight** - Fewer dependencies and moving parts
+
+## 📋 Prerequisites
+
+- **Perplexity Account** (Free or Pro)
+- **Session Token** (`__Secure-next-auth.session-token` from browser)
+- **Python 3.10+** (for local installation)
+- **Claude Code CLI** (for Claude variant) OR **OpenCode** (for OpenCode variant)
+- **PowerShell** (optional, for tail windows on Windows)
+
+## 🔑 Getting Your Session Token
 
 1. Log in at [perplexity.ai](https://www.perplexity.ai)
-2. Open DevTools (`F12`) → Application/Storage → Cookies
-3. Copy the value of `__Secure-next-auth.session-token`
-4. Add to `.env`: `PERPLEXITY_SESSION_TOKEN=your_token`
+2. Open DevTools (F12) → Application → Cookies
+3. Copy value of `__Secure-next-auth.session-token`
+4. Set as environment variable: `export PERPLEXITY_SESSION_TOKEN='your_token'`
 
-## 📊 Logging and Debugging
+Or add to `.env` file in repository directory.
 
-### Log Files
-
-All service output is automatically captured to timestamped log files in `~/.claude-perplexity/logs/`:
+## 📁 Project Structure
 
 ```
-20260130_230715_Perplexity_stdout.log   # Perplexity server output
-20260130_230715_Perplexity_stderr.log   # Perplexity errors
-20260130_230715_LiteLLM_stdout.log      # LiteLLM proxy output
-20260130_230715_LiteLLM_stderr.log      # LiteLLM errors
+perplexity-openai-api-updated/
+├── setup/                          # Organized setup scripts
+│   ├── common/                     # Shared utilities
+│   │   ├── utils.py                # Installation utilities
+│   │   └── launcher_utils.py       # Launcher & debugging utilities
+│   ├── claude/                     # Claude Code variant
+│   │   ├── install_claude_perplexity.py
+│   │   └── launch_claude_perplexity.py
+│   └── opencode/                   # OpenCode variant
+│       ├── install_opencode_perplexity.py
+│       └── launch_opencode_perplexity.py
+├── src/
+│   └── perplexity_webui_scraper/   # Core scraper library
+├── openai_server.py                # OpenAI-compatible API server
+├── fetch_models.py                 # Model discovery utility
+├── perplexity_setup.py             # Unified interactive setup
+├── install_claude_perplexity.py    # Claude installer (compatibility)
+└── launch_claude_perplexity.py     # Claude launcher (compatibility)
 ```
 
-### Real-Time Tail Windows (Windows)
+## 🎨 Available Models
 
-On Windows, tail windows automatically open showing:
-- Live-updating service output
-- Last 50 lines shown initially
-- Auto-updates as new logs are written
-- Separate windows for each service
+Both variants support all Perplexity models:
 
-### Service Monitoring
+- `perplexity-auto` - Best model (recommended)
+- `perplexity-sonar` - Fast queries
+- `perplexity-research` - Deep research mode
+- `perplexity-labs` - Experimental features
 
-The launcher monitors services in the background:
-- **Health Checks**: Every 30 seconds (configurable)
-- **Alerts**: Notified when service goes down
-- **Recovery**: Alerts when service comes back online
-- **Non-intrusive**: Only shows changes, doesn't spam console
+Plus external models via Perplexity:
+- GPT-5.x, Claude 4.5, Gemini 3, Grok 4.1, and more
 
-## 🐳 Docker Deployment
+List models: `curl http://localhost:8000/v1/models`
+
+## 🛠️ Advanced Usage
+
+### Server-Only Mode
+
+Run just the server without AI assistant:
 
 ```bash
-# 1. Copy environment template
-cp .env.example .env
+# OpenCode
+python setup/opencode/launch_opencode_perplexity.py --server-only
 
-# 2. Add your Perplexity session token to .env
-
-# 3. Start the server
-docker-compose up -d
-
-# 4. Test
-curl http://localhost:8000/health
-curl http://localhost:8000/v1/models
+# Claude Code
+python launch_claude_perplexity.py --services-only
 ```
 
-## 🛠️ Manual Setup
-
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-pip install -e .
-
-# 2. Copy and configure .env
-cp .env.example .env
-# Edit .env with your session token
-
-# 3. Run the server
-python openai_server.py
-```
-
-## 📡 API Usage
-
-The server is 100% OpenAI API compatible:
-
-### Python
+### Use with OpenAI SDK
 
 ```python
-import openai
+from openai import OpenAI
 
-client = openai.OpenAI(
-    api_key="dummy",
-    base_url="http://localhost:8000/v1"
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="dummy"  # Not required by default
 )
 
 response = client.chat.completions.create(
     model="perplexity-auto",
-    messages=[{"role": "user", "content": "What's the latest news about AI?"}]
+    messages=[{"role": "user", "content": "Hello!"}]
 )
 
 print(response.choices[0].message.content)
 ```
 
-### cURL
+### Streaming Responses
 
-```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "perplexity-auto",
-    "messages": [{"role": "user", "content": "What is AI?"}]
-  }'
+```python
+stream = client.chat.completions.create(
+    model="perplexity-auto",
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)
 ```
 
-## 📚 Available Endpoints
+## 📡 API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/chat/completions` | POST | Chat completions |
-| `/v1/models` | GET | List available models |
-| `/v1/models/refresh` | POST | Refresh models from Perplexity |
-| `/conversations` | GET | List conversations |
-| `/stats` | GET | Server statistics |
 | `/health` | GET | Health check |
+| `/v1/models` | GET | List available models |
+| `/v1/chat/completions` | POST | Chat completions (streaming supported) |
+| `/v1/completions` | POST | Legacy completions |
+| `/v1/models/refresh` | POST | Force refresh models |
+| `/conversations` | GET | List active conversations |
+| `/conversations/{id}` | DELETE | Delete conversation |
+| `/stats` | GET | Server statistics |
 
-## 🤖 Available Models
+## 🐛 Debugging Features
 
-Models are automatically discovered from Perplexity. Common models include:
+Both variants include comprehensive debugging:
 
-- `perplexity-auto` - Auto-select best model (default)
-- `perplexity-sonar` - Fast responses
-- `perplexity-research` - Deep research capabilities
-- `perplexity-labs` - Multi-step tasks with advanced troubleshooting
+### Log Files
 
-Other models may be available including:
-- GPT models (via Perplexity)
-- Claude models (via Perplexity)
-- Gemini models (via Perplexity)
-- Grok models (via Perplexity)
-
-Check available models with:
-```bash
-curl http://localhost:8000/v1/models
+All output captured in `~/.{variant}-perplexity/logs/`:
 ```
+20260131_143022_Perplexity_stdout.log
+20260131_143022_Perplexity_stderr.log
+20260131_143022_LiteLLM_stdout.log  (Claude variant only)
+20260131_143022_LiteLLM_stderr.log  (Claude variant only)
+```
+
+### Live Tail Windows (Windows)
+
+On Windows, PowerShell windows automatically open showing:
+- Last 50 lines initially
+- Live-updating as new logs appear
+- Separate window per service
+
+### Service Monitoring
+
+Background monitoring with:
+- Health checks every 30 seconds
+- Alerts when services go down
+- Recovery notifications
+- Non-intrusive console updates
 
 ## 🔍 Troubleshooting
 
-### Services Won't Start
+### Port Already in Use
 
-**Problem**: Port already in use
-```
-Port 8000 in use but not responding
-```
-
-**Solution**: Kill the process using the port:
 ```bash
 # Windows
 netstat -ano | findstr :8000
@@ -342,105 +255,101 @@ taskkill /PID <PID> /F
 lsof -ti:8000 | xargs kill -9
 ```
 
-### Claude Can't Connect
+### Session Token Expired
 
-**Problem**: Claude says it can't connect to the model
-
-**Solution**: Verify services are running:
+Get a fresh token from perplexity.ai cookies and update:
 ```bash
+export PERPLEXITY_SESSION_TOKEN='new_token'
+```
+
+### Services Won't Start
+
+Check logs in `~/.{variant}-perplexity/logs/` for detailed error messages.
+
+### OpenCode/Claude Not Found
+
+Install the CLI:
+- **OpenCode**: `curl -fsSL https://opencode.ai/install | bash`
+- **Claude Code**: Follow [Anthropic's installation guide](https://claude.ai/code)
+
+## 📊 Comparison: OpenCode vs Claude Code
+
+| Feature | OpenCode | Claude Code |
+|---------|----------|-------------|
+| **License** | Open Source | Proprietary |
+| **Setup** | Simple | Moderate |
+| **Architecture** | Direct | via LiteLLM |
+| **Ports** | 8000 only | 8000 + 8080 |
+| **Dependencies** | Fewer | More |
+| **Config** | JSON file | Auto YAML |
+
+See [README_VARIANTS.md](README_VARIANTS.md) for detailed comparison.
+
+## 📝 Configuration
+
+### Environment Variables
+
+```bash
+# Required
+PERPLEXITY_SESSION_TOKEN=your_token
+
+# Optional
+PORT=8000                    # Server port
+LOG_LEVEL=INFO              # Logging level
+ENABLE_RATE_LIMITING=true   # Rate limiting
+REQUESTS_PER_MINUTE=60      # Rate limit
+CONVERSATION_TIMEOUT=3600   # Session timeout
+DEFAULT_MODEL=perplexity-auto
+```
+
+## 🐳 Docker Deployment
+
+```bash
+# 1. Setup environment
+cp .env.example .env
+# Edit .env with your token
+
+# 2. Start server
+docker-compose up -d
+
+# 3. Test
 curl http://localhost:8000/health
-curl http://localhost:8080/health/readiness
 ```
-
-### Model Not Available
-
-**Problem**: Selected model doesn't work
-
-**Solution**: Models are discovered at startup. Restart services to refresh:
-```bash
-python launch_claude_perplexity.py --services-only
-```
-
-### Tail Windows Don't Open (Windows)
-
-**Problem**: Tail windows don't appear on Windows
-
-**Solution**:
-- Ensure PowerShell is installed
-- Check that the log files are being created (check logs directory)
-- Logs are still saved even if tail windows fail to open
-
-### Unicode Errors on Startup
-
-**Problem**: UnicodeEncodeError on Windows
-
-**Solution**: This is automatically fixed - the launcher sets UTF-8 encoding. If still happening:
-```bash
-set PYTHONIOENCODING=utf-8
-python launch_claude_perplexity.py
-```
-
-## 📋 Configuration Files
-
-### litellm_config.yaml
-
-Automatically generated and updated with discovered models:
-
-```yaml
-model_list:
-  - model_name: perplexity-auto
-    litellm_params:
-      model: openai/perplexity-auto
-      api_base: http://localhost:8000/v1
-      api_key: dummy
-
-litellm_settings:
-  set_verbose: false
-  drop_params: true
-```
-
-## 📖 API Documentation
-
-### Chat Completions
-
-```python
-response = client.chat.completions.create(
-    model="perplexity-auto",
-    messages=[
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Query here"}
-    ],
-    temperature=0.7,
-    max_tokens=2000,
-    stream=False
-)
-```
-
-### List Models
-
-```python
-models = client.models.list()
-for model in models.data:
-    print(f"- {model.id}")
-```
-
-## 📄 License
-
-MIT
-
-## ⚠️ Disclaimer
-
-This is an **unofficial** implementation using internal Perplexity APIs. Use at your own risk.
-
-By using this project, you agree to Perplexity AI's Terms of Service.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! The modular architecture makes it easy to:
+- Add new AI assistant variants
+- Improve shared utilities
+- Enhance existing features
+
+## 📄 License
+
+MIT License - See LICENSE file
+
+## ⚠️ Disclaimer
+
+This is an **unofficial** implementation using Perplexity's internal APIs. Use at your own risk.
+
+By using this project, you agree to Perplexity AI's Terms of Service.
+
+## 🙏 Credits
+
+- [Perplexity AI](https://www.perplexity.ai) - Search-augmented AI platform
+- [Henrique Coder](https://github.com/henrique-coder) - Original web scraper
+- [Anthropic](https://www.anthropic.com) - Claude Code
+- [Anomaly](https://github.com/anomalyco) - OpenCode
+- [BerriAI](https://github.com/BerriAI) - LiteLLM proxy
+- [FastAPI](https://fastapi.tiangolo.com) - Web framework
 
 ## 🔗 References
 
 - [Perplexity WebUI Scraper](https://github.com/henrique-coder/perplexity-webui-scraper)
 - [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
 - [LiteLLM Documentation](https://docs.litellm.ai/)
-- [Claude Code Documentation](https://claude.ai/claude-code)
+- [Claude Code](https://claude.ai/code)
+- [OpenCode](https://github.com/anomalyco/opencode)
+
+---
+
+**Get Started**: Run `python perplexity_setup.py` for interactive setup!
